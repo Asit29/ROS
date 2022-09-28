@@ -1,0 +1,192 @@
+<?xml version="1.0"?>
+<robot name="car" xmlns:xacro="http://www.ros.org/wiki/xacro">
+<xacro:property name="radius" value="0.02"/>
+<xacro:property name="length" value="0.008"/>
+<xacro:property name="mass" value="10"/>
+<xacro:property name="box_x" value="0.1"/>
+<xacro:property name="box_y" value="0.05"/>
+<xacro:property name="box_z" value="0.01"/>
+
+   <material name="blue">
+      <color rgba="0 1 0.8 1"/>
+   </material>	
+
+	<link name="dummy">
+   </link>
+
+	<link name="base_link">
+		<visual>
+			<geometry>
+	         <box size="${box_x} ${box_y} ${box_z}"/>
+         </geometry>
+			<origin xyz="0 0 0.02"/>
+         <material name="blue"/>
+      </visual>
+      <collision>
+         <origin xyz="0 0 0.02" rpy="0 0 0"/>
+	      <surface>
+       	 <friction>
+         	 <ode>
+         	   <mu>100000.0</mu>
+         	   <mu2>100000.0</mu2>
+         	 </ode>
+        	 </friction>
+         </surface>
+      	<geometry>
+         	<box size="0.1 0.05 0.01"/>
+         </geometry>
+      </collision>
+		<inertial>
+			<mass value="${mass}"/>
+		<inertia ixx="${mass / 12.0 * (box_x*box_x + box_z*box_z)}" ixy="0.0" ixz="0.0" iyy="${mass / 12.0 * (box_y*box_y + box_z*box_z)}" iyz="0.0" izz="${mass / 12.0 * (box_y*box_y + box_x*box_x)}"/>
+		</inertial>		
+	</link>
+	<joint name="dummy_joint" type="fixed">
+   	<parent link="dummy"/>
+   	<child link="base_link"/>
+   </joint>
+
+<xacro:macro name="wheel" params="prefix mid joint_x joint_y">
+	<link name="${prefix}_${mid}_wheel">
+		<visual>
+			<origin rpy="1.57 0 0" xyz="0 0 0"/>
+			<geometry>
+				<cylinder length="${length}" radius="${radius}"/>
+			</geometry>
+ 			<material name="blue">
+         	<color rgba="0 0 .8 1"/>
+         </material>
+		</visual>
+		<collision>
+			<surface>
+       	 <friction>
+         	 <ode>
+         	   <mu>100000.0</mu>
+         	   <mu2>100000.0</mu2>
+         	 </ode>
+        	 </friction>
+			</surface>
+			<origin xyz="0 0 0" rpy="${pi/2} 0 0"/>
+			<geometry>
+				<cylinder length="${length}" radius="${radius}"/>
+			</geometry>
+		</collision>
+		<inertial>
+			<mass value="${mass}"/>
+		<inertia  ixx="${mass*(3*radius*radius+length*length)/12}" ixy = "0" ixz = "0" iyy="${mass*(3*radius*radius+length*length)/12}" iyz = "0" izz="${mass*radius*radius/2}"/>
+		</inertial>
+	</link>
+
+	<joint name="${prefix}_${mid}" type="continuous">
+		<axis xyz="0 1 0" rpy="0 0 0" />
+		<parent link="base_link"/>
+		<child link="${prefix}_${mid}_wheel"/>
+		<limit effort="10000" velocity="100"/>
+      <joint_properties damping="1.0" friction="10000.0" />
+		<origin xyz="${joint_x*((box_x/2)-radius)} ${joint_y*((box_y/2)+(length/2))} ${0.011}"/>
+	</joint>
+</xacro:macro>
+
+<xacro:wheel prefix="left" mid="front" joint_x="1" joint_y="-1"/>
+<xacro:wheel prefix="left" mid="back" joint_x="-1" joint_y="-1"/>
+<xacro:wheel prefix="right" mid="front" joint_x="1" joint_y="1"/>
+<xacro:wheel prefix="right" mid="back" joint_x="-1" joint_y="1"/>
+
+	<link name="cam">
+		<visual>
+			<origin xyz="0 0 0.0075" rpy="0 0 0"/>
+			<geometry>
+				<box size="0.005 0.005 0.003"/>
+			</geometry>
+			<material name="red"/>
+		</visual>
+		<collision>
+			<origin xyz="0 0 0.0075" rpy="0 0 0"/>
+			<geometry>
+				<box size="0.005 0.005 0.003"/>
+			</geometry>
+			<material name="red"/>
+		</collision>
+		<inertial>
+			<mass value="2"/>
+			<origin xyz="0 0 0.0075" rpy="0 0 0"/>
+			<inertia ixx="1e-6" ixy="0" ixz="0" iyy="1e-6" iyz="0" izz="1e-6"/>
+		</inertial>
+	</link>
+	
+	<joint name="cammera_j" type="fixed">
+		<axis xyz="0 0 1"/>
+		<origin xyz="${box_x/2-0.0025} 0 0.02"/>
+		<parent link="base_link"/>	
+		<child link="cam"/>
+	</joint>	
+	
+
+<gazebo>
+  		<plugin name="skid_steer_drive_controller" filename="libgazebo_ros_skid_steer_drive.so">
+   	 <updateRate>20.0</updateRate>
+  		 <alwaysOn>true</alwaysOn>
+   	 <robotNamespace>/</robotNamespace>
+   	 <leftFrontJoint>left_front</leftFrontJoint>
+   	 <rightFrontJoint>right_front</rightFrontJoint>
+   	 <leftRearJoint>left_back</leftRearJoint>
+   	 <rightRearJoint>right_back</rightRearJoint>
+   	 <wheelSeparation>${box_y+0.06}</wheelSeparation>
+   	 <wheelDiameter>${2*radius}</wheelDiameter>
+   	 <robotBaseFrame>dummy</robotBaseFrame>
+     	 <torque>20</torque>
+    	 <commandTopic>cmd_vel</commandTopic>
+    	 <odometryTopic>odom</odometryTopic>
+    	 <topicName>cmd_vel</topicName>
+    	 <broadcastTF>1</broadcastTF>
+    	 <odometryFrame>odom</odometryFrame>
+	 	 <covariance_x>0.0001</covariance_x>
+	 	 <covariance_y>0.0001</covariance_y>
+	 	 <covariance_yaw>0.01</covariance_yaw>
+  	   </plugin>
+</gazebo>
+	
+  <gazebo reference="cam">
+    <sensor type="camera" name="cam">
+      <update_rate>30.0</update_rate>
+      <camera name="head">
+        <horizontal_fov>1.3962634</horizontal_fov>
+        <image>
+          <width>800</width>
+          <height>800</height>
+          <format>R8G8B8</format>
+        </image>
+        <clip>
+          <near>0.02</near>
+          <far>300</far>
+        </clip>
+        <noise>
+          <type>gaussian</type>
+          <mean>0.0</mean>
+          <stddev>0.007</stddev>
+        </noise>
+      </camera>
+      <plugin name="camera_controller" filename="libgazebo_ros_camera.so">
+        <alwaysOn>true</alwaysOn>
+        <updateRate>0.0</updateRate>
+        <cameraName>cam</cameraName>
+        <imageTopicName>image</imageTopicName>
+        <cameraInfoTopicName>camera_info</cameraInfoTopicName>
+        <frameName>cam</frameName>
+        <hackBaseline>0.07</hackBaseline>
+        <distortionK1>0.0</distortionK1>
+        <distortionK2>0.0</distortionK2>
+        <distortionK3>0.0</distortionK3>
+        <distortionT1>0.0</distortionT1>
+        <distortionT2>0.0</distortionT2>
+      </plugin>
+    </sensor>
+  </gazebo>
+ 
+
+</robot>
+
+
+
+
+
